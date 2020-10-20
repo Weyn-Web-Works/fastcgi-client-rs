@@ -5,9 +5,13 @@ use std::{
 
 /// Fastcgi params, please reference to nginx-php-fpm fastcgi_params.
 #[derive(Debug, Clone)]
-pub struct Params<'a>(HashMap<&'a str, &'a str>);
+pub struct Params<'a>(HashMap<String, &'a str>);
 
 impl<'a> Params<'a> {
+    pub fn insert<K: Into<String>>(&mut self, key: K, val: &'a str) {
+        self.0.insert(key.into(), val);
+    }
+
     pub fn set_gateway_interface(mut self, gateway_interface: &'a str) -> Self {
         self.insert("GATEWAY_INTERFACE", gateway_interface);
         self
@@ -104,7 +108,7 @@ impl<'a> Default for Params<'a> {
 }
 
 impl<'a> Deref for Params<'a> {
-    type Target = HashMap<&'a str, &'a str>;
+    type Target = HashMap<String, &'a str>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

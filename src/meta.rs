@@ -290,7 +290,7 @@ impl<'a> ParamPair<'a> {
 pub(crate) struct ParamPairs<'a>(Vec<ParamPair<'a>>);
 
 impl<'a> ParamPairs<'a> {
-    pub(crate) fn new(params: &Params<'a>) -> Self {
+    pub(crate) fn new(params: &'a Params<'a>) -> Self {
         let mut param_pairs = Vec::new();
         for (name, value) in params.iter() {
             let param_pair = ParamPair::new(name, value);
