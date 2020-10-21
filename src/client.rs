@@ -85,6 +85,7 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
         )
         .await?;
 
+        // this empty record marks the end of the Params-stream
         Header::write_to_stream_batches(
             RequestType::Params,
             id,
@@ -109,6 +110,7 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
         )
         .await?;
 
+        // this empty record marks the end of the Stdin-stream
         Header::write_to_stream_batches(
             RequestType::Stdin,
             id,
