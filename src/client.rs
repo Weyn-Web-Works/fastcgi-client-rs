@@ -143,11 +143,29 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
             match header.r#type {
                 RequestType::Stdout => {
                     let content = header.read_content_from_stream(read_stream).await?;
-                    self.get_output_mut(id)?.set_stdout(content)
+                    let len = content.len();
+                    let written_len = AsyncWriteExt::write(&mut self.get_output_mut(id)?.stdout, content.as_ref()).await?;
+                    if len != written_len {
+                        return Err(ClientError::UnexpectedEndOfOutput{
+                            id,
+                            output_type: RequestType::Stdout,
+                            written: written_len,
+                            expected: len
+                        }.into())
+                    }
                 }
                 RequestType::Stderr => {
                     let content = header.read_content_from_stream(read_stream).await?;
-                    self.get_output_mut(id)?.set_stderr(content)
+                    let len = content.len();
+                    let written_len = AsyncWriteExt::write(&mut self.get_output_mut(id)?.stderr, content.as_ref()).await?;
+                    if len != written_len {
+                        return Err(ClientError::UnexpectedEndOfOutput{
+                            id,
+                            output_type: RequestType::Stderr,
+                            written: written_len,
+                            expected: len
+                        }.into())
+                    }
                 }
                 RequestType::EndRequest => {
                     let end_request_rec = EndRequestRec::from_header(&header, read_stream).await?;

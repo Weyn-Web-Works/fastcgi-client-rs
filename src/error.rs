@@ -16,6 +16,9 @@ pub enum ClientError {
     #[error("Response not found of request id `{id}`")]
     ResponseNotFound { id: u16 },
 
+    #[error("Writing to output `{output_type}` ended prematurely for id `{id}`. Written `{written}` instead of `{expected}` bytes")]
+    UnexpectedEndOfOutput { id: u16, output_type: RequestType, written: usize, expected: usize },
+
     /// Maybe unimplemented request type received fom response.
     #[error("Response not found of request id `{request_type}`")]
     UnknownRequestType { request_type: RequestType },
