@@ -3,11 +3,10 @@ use crate::{
     meta::{BeginRequestRec, EndRequestRec, Header, ParamPairs, RequestType, Role},
     params::Params,
     request::Request,
-    response::ResponseMap,
-    ClientError, ClientResult, Response,
+    ClientError, ClientResult,
 };
 use log::debug;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 /// Async client for handling communication between fastcgi server.
@@ -15,7 +14,6 @@ pub struct Client<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> {
     stream: S,
     keep_alive: bool,
     request_id_generator: RequestIdGenerator,
-    outputs: ResponseMap,
 }
 
 impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
@@ -26,7 +24,6 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
             stream,
             keep_alive,
             request_id_generator: RequestIdGenerator::new(Duration::from_millis(1500)),
-            outputs: HashMap::new(),
         }
     }
 
@@ -34,26 +31,26 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
     pub async fn execute<I: AsyncRead + Unpin>(
         &mut self,
         request: Request<'_, I>,
-    ) -> ClientResult<Response> {
+        stdout: &mut (impl AsyncWrite + Unpin),
+        stderr: &mut (impl AsyncWrite + Unpin),
+    ) -> ClientResult<()> {
         let id = self.request_id_generator.alloc().await?;
-        let result = self.inner_execute(request, id).await;
+        self.inner_execute(request, id, stdout, stderr).await?;
         self.request_id_generator.release(id).await;
-        result
+        Ok(())
     }
 
     async fn inner_execute<I: AsyncRead + Unpin>(
         &mut self,
         mut request: Request<'_, I>,
         id: u16,
-    ) -> ClientResult<Response> {
+        stdout: &mut (impl AsyncWrite + Unpin),
+        stderr: &mut (impl AsyncWrite + Unpin),
+    ) -> ClientResult<()> {
         self.handle_request(id, &request.params, &mut request.stdin)
             .await?;
-        self.handle_response(id).await?;
-        Ok(self
-            .outputs
-            .get(&id)
-            .map(|output| output.clone())
-            .ok_or_else(|| ClientError::RequestIdNotFound { id })?)
+        self.handle_response(id, stdout, stderr).await?;
+        Ok(())
     }
 
     async fn handle_request<'a>(
@@ -128,9 +125,10 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
         Ok(())
     }
 
-    async fn handle_response(&mut self, id: u16) -> ClientResult<()> {
-        self.init_output(id);
-
+    async fn handle_response(&mut self, id: u16,
+                             stdout: &mut (impl AsyncWrite + Unpin),
+                             stderr: &mut (impl AsyncWrite + Unpin),
+    ) -> ClientResult<()> {
         let global_end_request_rec = loop {
             let read_stream = &mut self.stream;
             let header = Header::new_from_stream(read_stream).await?;
@@ -144,7 +142,7 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
                 RequestType::Stdout => {
                     let content = header.read_content_from_stream(read_stream).await?;
                     let len = content.len();
-                    let written_len = AsyncWriteExt::write(&mut self.get_output_mut(id)?.stdout, content.as_ref()).await?;
+                    let written_len = AsyncWriteExt::write(stdout, content.as_ref()).await?;
                     if len != written_len {
                         return Err(ClientError::UnexpectedEndOfOutput{
                             id,
@@ -157,7 +155,7 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
                 RequestType::Stderr => {
                     let content = header.read_content_from_stream(read_stream).await?;
                     let len = content.len();
-                    let written_len = AsyncWriteExt::write(&mut self.get_output_mut(id)?.stderr, content.as_ref()).await?;
+                    let written_len = AsyncWriteExt::write(stderr, content.as_ref()).await?;
                     if len != written_len {
                         return Err(ClientError::UnexpectedEndOfOutput{
                             id,
@@ -188,15 +186,5 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
                 .convert_to_client_result(end_request_rec.end_request.app_status),
             None => unreachable!(),
         }
-    }
-
-    fn init_output(&mut self, id: u16) {
-        self.outputs.insert(id, Default::default());
-    }
-
-    fn get_output_mut(&mut self, id: u16) -> ClientResult<&mut Response> {
-        self.outputs
-            .get_mut(&id)
-            .ok_or_else(|| ClientError::RequestIdNotFound { id }.into())
     }
 }

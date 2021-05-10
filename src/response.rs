@@ -1,6 +1,4 @@
-use std::{collections::HashMap, fmt, fmt::Debug};
-
-pub(crate) type ResponseMap = HashMap<u16, Response>;
+use std::{fmt, fmt::Debug};
 
 /// Output of fastcgi request, contains STDOUT and STDERR.
 #[derive(Default, Clone)]
