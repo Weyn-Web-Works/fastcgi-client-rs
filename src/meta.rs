@@ -9,6 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use log::debug;
 
 pub(crate) const VERSION_1: u8 = 1;
 pub(crate) const MAX_LENGTH: usize = 0xffff;
@@ -90,6 +91,7 @@ impl Header {
                 header = f(header);
             }
             header.write_to_stream(writer, buf).await?;
+            debug!("Written {} to php",String::from_utf8_lossy(&buf));
 
             had_writen = true;
         }
