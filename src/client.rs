@@ -141,7 +141,12 @@ impl<S: AsyncRead + AsyncWrite + Send + Sync + Unpin> Client<S> {
             match header.r#type {
                 RequestType::Stdout => {
                     let content = header.read_content_from_stream(read_stream).await?;
-                    debug!("PHP stdout: '{}'", String::from_utf8_lossy(&content));
+                    if header.content_length > 100 {
+                        debug!("PHP stdout: '{}...{}'", String::from_utf8_lossy(&content[0..50]), String::from_utf8_lossy(&content[(header.content_length-50) as usize..]));
+                    }
+                    else {
+                        debug!("PHP stdout: '{}'", String::from_utf8_lossy(&content));
+                    }
                     let len = content.len();
                     let written_len = AsyncWriteExt::write(stdout, content.as_ref()).await?;
                     if len != written_len {
