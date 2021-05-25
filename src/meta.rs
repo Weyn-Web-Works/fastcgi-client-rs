@@ -132,7 +132,7 @@ impl Header {
         Ok(())
     }
 
-    pub(crate) async fn new_from_stream(reader: &mut (dyn AsyncRead + Unpin)) -> io::Result<Self> {
+    pub(crate) async fn new_from_stream(reader: &mut (impl AsyncRead + Unpin + Send)) -> io::Result<Self> {
         let mut buf: [u8; HEADER_LEN] = [0; HEADER_LEN];
         reader.read_exact(&mut buf).await?;
 
@@ -148,7 +148,7 @@ impl Header {
 
     pub(crate) async fn read_content_from_stream(
         &self,
-        reader: &mut (dyn AsyncRead + Unpin),
+        reader: &mut (impl AsyncRead + Unpin + Send),
     ) -> io::Result<Vec<u8>> {
         let mut buf = vec![0; self.content_length as usize];
         reader.read_exact(&mut buf).await?;
@@ -370,7 +370,7 @@ pub(crate) struct EndRequestRec {
 impl EndRequestRec {
     pub(crate) async fn from_header(
         header: &Header,
-        reader: &mut (dyn AsyncRead + Unpin),
+        reader: &mut (impl AsyncRead + Unpin + Send),
     ) -> io::Result<Self> {
         let header = header.clone();
         let mut content = &*header.read_content_from_stream(reader).await?;
